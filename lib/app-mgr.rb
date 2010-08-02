@@ -35,7 +35,7 @@ class AppMgr
   end
   
   def execute(app_name, method, params='')
-    [@running[app_name].method('call_' + method.gsub(/-/,'_').to_sym).call(params), 'text/xml']
+    @running[app_name].method('call_' + method.gsub(/-/,'_').to_sym).call(params)
   end
 
   def running?(app_name)
