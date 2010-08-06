@@ -53,6 +53,10 @@ class AppMgr
     @app.select {|k,v| v[:running]}.keys
   end
 
+  def running?()
+    @app[app_name][:running]
+  end  
+  
   def available()
     @app.select {|k,v| v[:available] == true}.keys
   end
