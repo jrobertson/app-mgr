@@ -38,7 +38,7 @@ class AppMgr
   end
   
   def execute(app_name, method, params='')
-    [@app[app_name][:running].method('call_' + method.gsub(/-/,'_').to_sym).call(params)]
+    @app[app_name][:running].method('call_' + method.gsub(/-/,'_').to_sym).call(params)
   end
 
   def stop(app_name)
@@ -53,7 +53,7 @@ class AppMgr
     @app.select {|k,v| v[:running]}.keys
   end
 
-  def running?()
+  def running?(app_name)
     @app[app_name][:running]
   end  
   
