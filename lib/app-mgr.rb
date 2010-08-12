@@ -2,9 +2,10 @@
 
 # file: app-mgr.rb
 class AppMgr
-  def initialize()
-    super()
+  def initialize(content_type)
     @app = {}
+    @content_type = content_type
+    super()
   end
 
   def load(opt={})        
@@ -82,5 +83,42 @@ class AppMgr
       return "app %s not running" % app_name
     end
   end
+
+  
+  def run_projectx(project_name, method_name, qparams=[])
+
+    params = "<params>%s</params>" % qparams.map{|k,v| "<param var='%s'>%s</param>" % [k,v]}.join
+    xml_project = project = "<project name='%s'><methods><method name='%s'>%s</method></methods></project>" % [project_name, method_name, params]
+    projectx_handler(xml_project)
+  end
+  
+  private
+  
+  def projectx_handler(xml_project)
+    out = ''
+    doc = Document.new(xml_project)
+    project_name = doc.root.attribute('name').to_s
+
+    if self.running? project_name then
+
+      out = XPath.match(doc.root, 'methods/method').map  do |node_method|
+        method = node_method.attributes.get_attribute('name').to_s
+        params = node_method.elements['params'].to_s
+
+        method_out, @content_type = @@app.execute(project_name, method, params)
+        method_out
+      end
+
+      out = out.first if out.length == 1
+    else
+      out = "that project doesn't exist"
+    end
+    @content_type ||= 'text/xml'
+  
+    out
+  end
+
+
+  
 end
 
