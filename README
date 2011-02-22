@@ -1,6 +1,6 @@
 The app manager can be illustrated in 3 different examples:
 
-# 1) A basic app-mgr example - load, run, and execture
+# 1) A basic app-mgr example - load, run, and execute
 # 2) Calling another app from within an app e.g. registry
 # 3) Sharing variable values between apps
 
