@@ -1,124 +1,108 @@
 #!/usr/bin/ruby
 
 # file: app-mgr.rb
+
+require 'rscript'
+
+
 class AppMgr
-  def initialize(content_type)
+
+  attr_reader :app
+
+  def initialize(rsf: nil, reg: nil, rsc: nil, debug: true)
+    
+    @rsf, @reg, @rsc, @debug = rsf, reg, rsc, debug
+    @rscript = RScript.new(type: 'app', debug: debug)    
     @app = {}
-    @content_type = content_type
-    super()
+
+    load_all(rsf)
+    
   end
 
-  def load(opt={})        
-    o = {name: '', object: nil, config: {}, public: {}}.merge!(opt)
-
-    key, name = o.shift
-    @app[name] = o
-    "'%s' loaded" % name
-  end
-
-  def run(app_name)
-    app = @app[app_name]
-    if app then
-      options = {public: app[:public]}
-      options[:config] = app[:config] unless app[:config].empty?
-      app[:running] = app[:object].new(options)
-
-      return "'%s' running ..." % app_name
-    else
-      return "app %s not available" % app_name
-      end      
+  def available()
+    @app.select {|k,v| v[:available] == true}.keys
   end
   
-  def connect(app_name)
-    app = @app[app_name]
-    if app and app[:running] then 
-      yield(app[:public])
-    else
-      return "app %s not running" % app_name
-    end
-  end
-  
-  def execute(app_name, method, params='')
-    @app[app_name][:running].method('call_' + method.gsub(/-/,'_').to_sym).call(params)
+  def call(app_name)
+    @app[app_name.to_sym][:running].call
   end
 
-  def stop(app_name)
-    if @app[app_name].delete(:running) then
-      return "app %s stopped" % app_name
-    else
-      return "couldn't find app %s" % app_name
-    end
+  def execute(name, method, params='')
+    @app[name.to_sym][:running].method(method.to_sym).call(params)
+  end
+
+  def run(name)
+
+    app = @app[name.to_sym]
+    class_name = app[:code][/(?<=class )\w+/]    
+    app[:running] = eval(class_name + '.new')
+
   end
 
   def running()
     @app.select {|k,v| v[:running]}.keys
   end
 
-  def running?(app_name)
-    @app[app_name][:running]
+  def running?(name)
+    @app[name.to_sym][:running] ? true : false
   end  
-  
-  def available()
-    @app.select {|k,v| v[:available] == true}.keys
-  end
 
-  def unload(app_name)
+  def connect(name)
 
-    handler_name = @app[app_name][:running].name
+    app = @app[name.to_sym]
     
-    if handler_name then
-      Object.send(:remove_const, handler_name)
-      @app.delete app_name
-      return "app %s unloaded" % app_name
+    if app and app[:running] then 
+      yield(app[:running])
     else
-      return "couldn't find app %s" % app_name
+      return "app %s not running" % name
     end
+    
   end
 
-  def show_public_methods(app_name)
-    app = @app[app_name]
-    if app and app[:running] then
-      return app[:running].public_methods.map(&:to_s).grep(/call_/).map {|x| x.gsub(/call_/,'').gsub(/_/,'-')}.sort.join(', ')
+  def stop(name)
+
+    app = @app[name.to_sym]
+
+    if app.delete(:running) then
+      return "app %s stopped" % name
     else
-      return "app %s not running" % app_name
+      return "couldn't find app %s" % name
     end
+    
   end
 
-  
-  def run_projectx(project_name, method_name, qparams=[])
+  def unload(name)
 
-    params = "<params>%s</params>" % qparams.map{|k,v| "<param var='%s'>%s</param>" % [k,v]}.join
-    xml_project = project = "<project name='%s'><methods><method name='%s'>%s</method></methods></project>" % [project_name, method_name, params]
-    projectx_handler(xml_project)
+    class_name = @app[name.to_sym][:running].class.name
+    
+    if class_name then
+      Object.send(:remove_const, class_name)
+      @app.delete name.to_sym
+      return "app %s unloaded" % name
+    else
+      return "couldn't find app %s" % name
+    end
+    
   end
-  
+
   private
-  
-  def projectx_handler(xml_project)
-    out = ''
-    doc = Document.new(xml_project)
-    project_name = doc.root.attribute('name').to_s
 
-    if self.running? project_name then
+  def load_all(rsf_package)
 
-      out = XPath.match(doc.root, 'methods/method').map  do |node_method|
-        method = node_method.attributes.get_attribute('name').to_s
-        params = node_method.elements['params'].to_s
+    @rscript.jobs(rsf_package).each do |app_name|
 
-        method_out, @content_type = @@app.execute(project_name, method, params)
-        method_out
-      end
+      puts 'app_name: ' + app_name.inspect if @debug
+      app = @app[app_name] = {}
 
-      out = out.first if out.length == 1
-    else
-      out = "that project doesn't exist"
+      codeblock = @rscript.read(['//app:' + app_name.to_s, @rsf]).first      
+      puts 'codeblock: ' + codeblock.inspect if @debug
+      app[:code] = codeblock
+      
+      reg, rsc = @reg, @rsc      
+      eval codeblock
+      
     end
-    @content_type ||= 'text/xml'
-  
-    out
+
   end
 
-
-  
 end
-
