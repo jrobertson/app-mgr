@@ -1,37 +1,26 @@
-# Introducing the app-mgr gem
+# Using the App-mgr gem
 
+
+## Usage
+
+    require 'rsc'
     require 'app-mgr'
+    require 'remote_dwsregistry'
 
-    app = AppMgr.new
+    reg = RemoteDwsRegistry.new(domain: 'reg')
+    rsc = RSC.new 'rse', 'http://a0.jamesrobertson.eu/qbx/r/dandelion_a3'
 
-    class Fun_handler
-      def initialize(opt={})
-        opt[:variables][:evening] = true    
-      end
+    apps = AppMgr.new(rsf: '/home/james/app-mgr/default.rsf', rsc: rsc, reg: reg)    
 
-      def call_level8(params='')
-        '&lt;result&gt;we are here&lt;/result&gt;'
-      end
-    end
+    apps.run 'bintimes'
+    apps.running
+    apps.running? 'bintimes'
+    #apps.stop 'bintimes'
+    #apps.running? 'bintimes'
+    apps.connect('bintimes') {|x| x.call }
 
-    app.load 'fun', Fun_handler
-    #=&gt; "'fun' loaded"
+## Resources
 
-    app.run 'fun'
-    #=&gt; "'fun' running ..."
+* app-mgr https://rubygems.org/gems/app-mgr
 
-    app.execute 'fun', 'level8',''
-    #=&gt; ["&lt;result&gt;we are here&lt;/result&gt;", "text/xml"]
-
-    puts app.connect('fun') {|h| h.inspect}
-    {:evening=&gt;true}
-
-    app.connect('fun') do |h|
-      h[:start] = Time.now
-    end
-
-    puts app.connect('fun') {|h| h.inspect}
-    #=&gt; {:evening=&gt;true, :start=&gt;2010-08-02 18:49:40 +0100}
-    
-The app-mgr gem is used to load, run, and execute ProjectX applications.
-
+appmgr app apps manager gem
