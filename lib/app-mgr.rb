@@ -20,11 +20,14 @@ class AppMgr
   end
 
   def available()
-    @app.select {|k,v| v[:available] == true}.keys
+    @app.keys
   end
   
   def call(app_name)
+    
+    run(app_name) unless running? app_name
     @app[app_name.to_sym][:running].call
+    
   end
 
   def execute(name, method, params='')
