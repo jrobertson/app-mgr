@@ -4,41 +4,49 @@
 
 require 'rscript'
 
+class Runner
+  def run(s)
+    eval(s)
+  end
+end
+
 
 class AppMgr
 
-  attr_reader :app
+  def initialize(rsf: nil, type: 'app', debug: false)
 
-  def initialize(rsf: nil, reg: nil, rsc: nil, debug: true)
-    
-    @rsf, @reg, @rsc, @debug = rsf, reg, rsc, debug
-    @rscript = RScript.new(type: 'app', debug: debug)    
+    @rsf, @type, @debug = rsf, type, debug
+    @rscript = RScript.new(type: type, cache: nil, debug: debug)
     @app = {}
 
     load_all(rsf)
-    
+
+  end
+
+  def [](name)
+
+    app = @app[name.to_sym]
+
+    return app[:running] if app and app[:running]
+
   end
 
   def available()
     @app.keys
   end
-  
-  def call(app_name)
-    
-    run(app_name) unless running? app_name
-    @app[app_name.to_sym][:running].call
-    
-  end
 
-  def execute(name, method, params='')
-    @app[name.to_sym][:running].method(method.to_sym).call(params)
+  def restart(name)
+    load_app(name)
+    run(name)
+    name.to_s + ' restarted'
   end
 
   def run(name)
 
     app = @app[name.to_sym]
-    class_name = app[:code][/(?<=class )\w+/]    
-    app[:running] = eval(class_name + '.new')
+
+    #app[:running] = eval(app[:code])
+    app[:running] = Runner.new.run(app[:code])
 
   end
 
@@ -48,19 +56,8 @@ class AppMgr
 
   def running?(name)
     @app[name.to_sym][:running] ? true : false
-  end  
-
-  def connect(name)
-
-    app = @app[name.to_sym]
-    
-    if app and app[:running] then 
-      yield(app[:running])
-    else
-      return "app %s not running" % name
-    end
-    
   end
+
 
   def stop(name)
 
@@ -71,21 +68,22 @@ class AppMgr
     else
       return "couldn't find app %s" % name
     end
-    
+
   end
 
   def unload(name)
 
-    class_name = @app[name.to_sym][:running].class.name
-    
+    app = @app[name.to_sym]
+
     if class_name then
-      Object.send(:remove_const, class_name)
+
       @app.delete name.to_sym
       return "app %s unloaded" % name
+
     else
       return "couldn't find app %s" % name
     end
-    
+
   end
 
   private
@@ -95,15 +93,32 @@ class AppMgr
     @rscript.jobs(rsf_package).each do |app_name|
 
       puts 'app_name: ' + app_name.inspect if @debug
-      app = @app[app_name] = {}
 
-      codeblock = @rscript.read(['//app:' + app_name.to_s, @rsf]).first      
+      @app[app_name] = {}
+      codeblock, _, attr = @rscript.read(["//#{@type}:" + app_name.to_s, @rsf])
+
+      next if attr[:disabled] == 'true'
+
       puts 'codeblock: ' + codeblock.inspect if @debug
-      app[:code] = codeblock
-      
-      reg, rsc = @reg, @rsc      
-      eval codeblock
-      
+      @app[app_name][:code] = codeblock
+      app = @app[app_name]
+
+      puts 'app: ' + app.inspect
+      next unless app
+
+      app[:running] = Runner.new.run(app[:code])
+
+    end
+
+    def load_app(name)
+
+      codeblock, _, attr = @rscript.read(["//#{@type}:" + name.to_s, @rsf])
+
+      return if attr[:disabled] == 'true'
+
+      puts 'codeblock: ' + codeblock.inspect if @debug
+      @app[name][:code] = codeblock
+      return @app[name]
     end
 
   end
